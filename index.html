@@ -3,263 +3,274 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Startup Founder: Decision Game</title>
+  <title>BlockCraft 2D</title>
   <style>
-    * { box-sizing: border-box; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-    body {
-      background-color: #121212;
-      color: #fff;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      min-height: 100vh;
-      margin: 0;
-    }
-    .game-container {
-      width: 360px;
-      background: #1e1e1e;
-      padding: 20px;
-      border-radius: 16px;
-      box-shadow: 0 10px 30px rgba(0,0,0,0.5);
-      text-align: center;
-    }
-    /* Meters */
-    .meters {
-      display: grid;
-      grid-template-columns: repeat(4, 1fr);
-      gap: 8px;
-      margin-bottom: 20px;
-    }
-    .meter-box {
-      background: #2a2a2a;
-      padding: 8px 4px;
-      border-radius: 8px;
-      font-size: 11px;
-    }
-    .meter-bar-bg {
-      background: #444;
-      height: 6px;
-      border-radius: 3px;
-      margin-top: 6px;
-      overflow: hidden;
-    }
-    .meter-bar-fill {
-      height: 100%;
-      width: 50%;
-      background: #4caf50;
-      transition: width 0.3s ease, background-color 0.3s ease;
-    }
-    /* Card Stack */
-    .card-container {
-      perspective: 1000px;
-      height: 280px;
-      margin-bottom: 20px;
-    }
-    .card {
-      background: #2c2c3e;
-      border: 2px solid #3f3f5a;
-      border-radius: 12px;
-      padding: 20px;
-      height: 100%;
-      display: flex;
-      flex-direction: column;
-      justify-content: space-between;
-      box-shadow: 0 4px 15px rgba(0,0,0,0.3);
-      transition: transform 0.2s ease;
-    }
-    .card-title { font-size: 14px; color: #8a8aab; text-transform: uppercase; letter-spacing: 1px; }
-    .card-text { font-size: 16px; line-height: 1.4; margin: 15px 0; color: #e0e0e0; }
-    .card-icon { font-size: 40px; margin-top: 10px; }
-    /* Decision Buttons */
-    .choices {
-      display: flex;
-      gap: 10px;
-    }
-    .btn {
-      flex: 1;
-      padding: 12px 8px;
-      border: none;
-      border-radius: 8px;
-      font-weight: bold;
-      cursor: pointer;
-      font-size: 13px;
-      transition: background 0.2s ease, transform 0.1s;
-    }
-    .btn:active { transform: scale(0.96); }
-    .btn-left { background: #e53935; color: white; }
-    .btn-right { background: #1e88e5; color: white; }
-    .btn-restart { background: #4caf50; color: white; width: 100%; display: none; margin-top: 10px; }
-    
-    .game-over-screen { display: none; }
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body { background: #111; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+    #ui { position: absolute; top: 10px; left: 10px; display: flex; gap: 10px; z-index: 10; }
+    .hotbar-slot { width: 50px; height: 50px; border: 2px solid #555; background: rgba(0,0,0,0.6); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; user-select: none; }
+    .hotbar-slot.active { border-color: #00e676; background: rgba(0,230,118,0.2); }
+    .slot-color { width: 20px; height: 20px; border-radius: 4px; margin-bottom: 2px; }
+    #instructions { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px 15px; border-radius: 8px; font-size: 12px; line-height: 1.5; z-index: 10; pointer-events: none; }
+    canvas { border: 2px solid #333; background: #87CEEB; image-rendering: pixelated; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
   </style>
 </head>
 <body>
 
-<div class="game-container">
-  <!-- Status Meters -->
-  <div class="meters" id="meters">
-    <div class="meter-box">
-      💰 Money
-      <div class="meter-bar-bg"><div class="meter-bar-fill" id="meter-money"></div></div>
-    </div>
-    <div class="meter-box">
-      📈 Users
-      <div class="meter-bar-bg"><div class="meter-bar-fill" id="meter-users"></div></div>
-    </div>
-    <div class="meter-box">
-      😃 Morale
-      <div class="meter-bar-bg"><div class="meter-bar-fill" id="meter-morale"></div></div>
-    </div>
-    <div class="meter-box">
-      💻 Server
-      <div class="meter-bar-bg"><div class="meter-bar-fill" id="meter-server"></div></div>
-    </div>
+<div id="ui">
+  <div class="hotbar-slot active" id="slot-1" onclick="selectSlot(1)">
+    <div class="slot-color" style="background:#556B2F"></div>
+    <span id="count-1">Dirt: 0</span>
   </div>
-
-  <!-- Active Card Display -->
-  <div class="card-container">
-    <div class="card" id="card">
-      <div>
-        <div class="card-title" id="card-sender">Notification</div>
-        <div class="card-icon" id="card-icon">💻</div>
-        <div class="card-text" id="card-text">Loading deck...</div>
-      </div>
-      <div class="card-title" style="font-size: 11px;">Days Survived: <span id="day-counter">1</span></div>
-    </div>
+  <div class="hotbar-slot" id="slot-2" onclick="selectSlot(2)">
+    <div class="slot-color" style="background:#708090"></div>
+    <span id="count-2">Stone: 0</span>
   </div>
-
-  <!-- Choice Actions -->
-  <div class="choices" id="choices">
-    <button class="btn btn-left" id="btn-left" onclick="makeChoice('left')">Option A</button>
-    <button class="btn btn-right" id="btn-right" onclick="makeChoice('right')">Option B</button>
+  <div class="hotbar-slot" id="slot-3" onclick="selectSlot(3)">
+    <div class="slot-color" style="background:#8B4513"></div>
+    <span id="count-3">Wood: 0</span>
   </div>
-  <button class="btn btn-restart" id="btn-restart" onclick="restartGame()">Restart Game</button>
 </div>
 
+<div id="instructions">
+  <b>Controls:</b><br>
+  A / D or ⬅️ / ➡️ : Move Left / Right<br>
+  W / Space / ⬆️ : Jump<br>
+  Left Click : Mine Block<br>
+  Right Click : Place Selected Block<br>
+  1, 2, 3 : Select Hotbar Slot
+</div>
+
+<canvas id="gameCanvas" width="800" height="480"></canvas>
+
 <script>
-  // Game State (0 to 100 scale)
-  let stats = { money: 50, users: 50, morale: 50, server: 50 };
-  let day = 1;
-  let currentCard = null;
+const canvas = document.getElementById('gameCanvas');
+const ctx = canvas.getContext('2d');
 
-  // Decision Deck: Stories and their branching consequences
-  const deck = [
-    {
-      sender: "Lead Developer",
-      icon: "👨‍💻",
-      text: "Our server crashed from an influx of new traffic! We need to upgrade immediately.",
-      left: { label: "Pay for cloud upgrade", effects: { money: -20, server: +30, users: +10 } },
-      right: { label: "Ignore it and wait", effects: { users: -25, server: -20, morale: -10 } }
-    },
-    {
-      sender: "Venture Capitalist",
-      icon: "💼",
-      text: "An investor offers $50,000, but demands you fire half your engineering team.",
-      left: { label: "Accept investment", effects: { money: +40, morale: -35, server: -10 } },
-      right: { label: "Reject offer", effects: { money: -10, morale: +15 } }
-    },
-    {
-      sender: "Marketing Manager",
-      icon: "📢",
-      text: "We can run a viral influencer campaign. It costs money, but could double our userbase.",
-      left: { label: "Run the campaign", effects: { money: -25, users: +35, server: -10 } },
-      right: { label: "Focus on organic growth", effects: { users: +5, morale: +5 } }
-    },
-    {
-      sender: "Lead Designer",
-      icon: "🎨",
-      text: "The team wants to completely redesign the dashboard UI. It will delay new features.",
-      left: { label: "Approve redesign", effects: { morale: +20, users: +10, money: -10 } },
-      right: { label: "Deny request", effects: { morale: -20, users: -5 } }
-    },
-    {
-      sender: "Security Researcher",
-      icon: "🔒",
-      text: "I found a major security flaw in your database. Fix it now or risk a leak.",
-      left: { label: "Hire auditors to fix", effects: { money: -20, server: +25 } },
-      right: { label: "Patch it yourself later", effects: { server: -35, users: -10 } }
-    }
-  ];
+const TILE_SIZE = 32;
+const COLS = 50;
+const ROWS = 30;
 
-  function updateMeters() {
-    for (let key in stats) {
-      // Clamp between 0 and 100
-      stats[key] = Math.max(0, Math.min(100, stats[key]));
-      
-      const bar = document.getElementById(`meter-${key}`);
-      bar.style.width = stats[key] + '%';
-      
-      // Dynamic color shift based on health
-      if (stats[key] < 25) bar.style.backgroundColor = '#e53935';
-      else if (stats[key] < 50) bar.style.backgroundColor = '#fdd835';
-      else bar.style.backgroundColor = '#4caf50';
-    }
-  }
+// World Grid (0: Air, 1: Grass, 2: Dirt, 3: Stone, 4: Wood)
+let world = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-  function loadCard() {
-    // Pick a random card from deck
-    const randomIndex = Math.floor(Math.random() * deck.length);
-    currentCard = deck[randomIndex];
+const BLOCK_TYPES = {
+  1: { name: 'Grass', color: '#556B2F', topColor: '#7CFC00' },
+  2: { name: 'Dirt', color: '#556B2F', topColor: null },
+  3: { name: 'Stone', color: '#708090', topColor: null },
+  4: { name: 'Wood', color: '#8B4513', topColor: null }
+};
 
-    document.getElementById('card-sender').innerText = currentCard.sender;
-    document.getElementById('card-icon').innerText = currentCard.icon;
-    document.getElementById('card-text').innerText = currentCard.text;
-    document.getElementById('btn-left').innerText = currentCard.left.label;
-    document.getElementById('btn-right').innerText = currentCard.right.label;
-    document.getElementById('day-counter').innerText = day;
-  }
+let inventory = { 1: 10, 2: 10, 3: 5 }; // Initial blocks
+let activeSlot = 1;
 
-  function makeChoice(direction) {
-    const choice = currentCard[direction];
+// Player Setup
+let player = {
+  x: 400,
+  y: 100,
+  width: 20,
+  height: 48,
+  vx: 0,
+  vy: 0,
+  speed: 4,
+  jumpPower: -10,
+  grounded: false
+};
+
+const keys = {};
+
+// Procedural Terrain Generation
+function generateWorld() {
+  for (let x = 0; x < COLS; x++) {
+    // Sine wave terrain
+    let surfaceY = Math.floor(12 + Math.sin(x * 0.2) * 3);
     
-    // Apply statistical consequences
-    for (let stat in choice.effects) {
-      if (stats.hasOwnProperty(stat)) {
-        stats[stat] += choice.effects[stat];
+    for (let y = 0; y < ROWS; y++) {
+      if (y === surfaceY) {
+        world[y][x] = 1; // Grass
+      } else if (y > surfaceY && y < surfaceY + 5) {
+        world[y][x] = 2; // Dirt
+      } else if (y >= surfaceY + 5) {
+        world[y][x] = 3; // Stone
       }
     }
 
-    day++;
-    updateMeters();
-
-    // Check game over state
-    if (checkGameOver()) return;
-
-    loadCard();
-  }
-
-  function checkGameOver() {
-    let reason = "";
-    if (stats.money <= 0) reason = "You ran out of money! The company went bankrupt.";
-    else if (stats.users <= 0) reason = "All your users left for a competitor.";
-    else if (stats.morale <= 0) reason = "Your entire team quit due to burnout.";
-    else if (stats.server <= 0) reason = "Your servers suffered a catastrophic crash.";
-
-    if (reason) {
-      document.getElementById('card-sender').innerText = "GAME OVER";
-      document.getElementById('card-icon').innerText = "☠️";
-      document.getElementById('card-text').innerText = `${reason}\n\nYou survived for ${day} days!`;
-      
-      document.getElementById('choices').style.display = 'none';
-      document.getElementById('btn-restart').style.display = 'block';
-      return true;
+    // Generate random trees
+    if (x > 3 && x < COLS - 4 && Math.random() < 0.15 && world[surfaceY][x] === 1) {
+      let trunkHeight = Math.floor(Math.random() * 3) + 3;
+      for (let i = 1; i <= trunkHeight; i++) {
+        if (surfaceY - i >= 0) world[surfaceY - i][x] = 4; // Wood Trunk
+      }
     }
-    return false;
+  }
+}
+
+// Input Handlers
+window.addEventListener('keydown', e => {
+  keys[e.key.toLowerCase()] = true;
+  if (['1', '2', '3'].includes(e.key)) selectSlot(parseInt(e.key));
+});
+window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
+
+// Disable context menu for right-click placement
+canvas.addEventListener('contextmenu', e => e.preventDefault());
+
+let mousePos = { x: 0, y: 0 };
+canvas.addEventListener('mousemove', e => {
+  const rect = canvas.getBoundingClientRect();
+  mousePos.x = e.clientX - rect.left;
+  mousePos.y = e.clientY - rect.top;
+});
+
+canvas.addEventListener('mousedown', e => {
+  const gridX = Math.floor(mousePos.x / TILE_SIZE);
+  const gridY = Math.floor(mousePos.y / TILE_SIZE);
+
+  if (gridX < 0 || gridX >= COLS || gridY < 0 || gridY >= ROWS) return;
+
+  // Calculate distance from player
+  const playerGridX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
+  const playerGridY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
+  const dist = Math.hypot(gridX - playerGridX, gridY - playerGridY);
+
+  if (dist > 6) return; // Reach limit
+
+  if (e.button === 0) { // Mine
+    let block = world[gridY][gridX];
+    if (block !== 0) {
+      let itemType = block === 1 ? 1 : block; // Grass converts to dirt item
+      inventory[itemType] = (inventory[itemType] || 0) + 1;
+      world[gridY][gridX] = 0;
+      updateUI();
+    }
+  } else if (e.button === 2) { // Place
+    if (world[gridY][gridX] === 0 && inventory[activeSlot] > 0) {
+      // Don't place inside player bounds
+      const blockRect = { x: gridX * TILE_SIZE, y: gridY * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
+      if (!checkOverlap(player, blockRect)) {
+        world[gridY][gridX] = activeSlot === 1 ? 2 : activeSlot; // Place dirt or stone
+        inventory[activeSlot]--;
+        updateUI();
+      }
+    }
+  }
+});
+
+function selectSlot(slot) {
+  activeSlot = slot;
+  document.querySelectorAll('.hotbar-slot').forEach(el => el.classList.remove('active'));
+  document.getElementById(`slot-${slot}`).classList.add('active');
+}
+
+function updateUI() {
+  document.getElementById('count-1').innerText = `Dirt: ${inventory[1] || 0}`;
+  document.getElementById('count-2').innerText = `Stone: ${inventory[2] || 0}`;
+  document.getElementById('count-3').innerText = `Wood: ${inventory[3] || 0}`;
+}
+
+function checkOverlap(r1, r2) {
+  return !(r1.x + r1.width <= r2.x || r1.x >= r2.x + r2.width || r1.y + r1.height <= r2.y || r1.y >= r2.y + r2.height);
+}
+
+function updatePhysics() {
+  // Horizontal movement
+  if (keys['a'] || keys['arrowleft']) player.vx = -player.speed;
+  else if (keys['d'] || keys['arrowright']) player.vx = player.speed;
+  else player.vx = 0;
+
+  // Jump
+  if ((keys['w'] || keys[' '] || keys['arrowup']) && player.grounded) {
+    player.vy = player.jumpPower;
+    player.grounded = false;
   }
 
-  function restartGame() {
-    stats = { money: 50, users: 50, morale: 50, server: 50 };
-    day = 1;
-    document.getElementById('choices').style.display = 'flex';
-    document.getElementById('btn-restart').style.display = 'none';
-    updateMeters();
-    loadCard();
+  // Gravity
+  player.vy += 0.5;
+
+  // X Collision
+  player.x += player.vx;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (world[y][x] !== 0) {
+        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
+        if (checkOverlap(player, block)) {
+          if (player.vx > 0) player.x = block.x - player.width;
+          else if (player.vx < 0) player.x = block.x + block.width;
+        }
+      }
+    }
   }
 
-  // Initialize
-  updateMeters();
-  loadCard();
+  // Y Collision
+  player.y += player.vy;
+  player.grounded = false;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (world[y][x] !== 0) {
+        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
+        if (checkOverlap(player, block)) {
+          if (player.vy > 0) {
+            player.y = block.y - player.height;
+            player.vy = 0;
+            player.grounded = true;
+          } else if (player.vy < 0) {
+            player.y = block.y + block.height;
+            player.vy = 0;
+          }
+        }
+      }
+    }
+  }
+}
+
+function draw() {
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+  // Draw World
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      let tile = world[y][x];
+      if (tile !== 0) {
+        ctx.fillStyle = BLOCK_TYPES[tile].color;
+        ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+        
+        // Grass top accent
+        if (tile === 1) {
+          ctx.fillStyle = BLOCK_TYPES[1].topColor;
+          ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 6);
+        }
+
+        // Tile outlines
+        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+      }
+    }
+  }
+
+  // Draw Target Outline
+  const gridX = Math.floor(mousePos.x / TILE_SIZE);
+  const gridY = Math.floor(mousePos.y / TILE_SIZE);
+  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
+  ctx.lineWidth = 2;
+  ctx.strokeRect(gridX * TILE_SIZE, gridY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+
+  // Draw Player
+  ctx.fillStyle = '#FF5722';
+  ctx.fillRect(player.x, player.y, player.width, player.height);
+  // Player Eye
+  ctx.fillStyle = '#FFF';
+  ctx.fillRect(player.x + (player.vx >= 0 ? 12 : 2), player.y + 8, 6, 6);
+}
+
+function loop() {
+  updatePhysics();
+  draw();
+  requestAnimationFrame(loop);
+}
+
+generateWorld();
+updateUI();
+loop();
 </script>
-
 </body>
 </html>
