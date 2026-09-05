@@ -3,42 +3,22 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>BlockCraft 2D</title>
+  <title>Terraria Craft & Combat</title>
   <style>
     * { box-sizing: border-box; margin: 0; padding: 0; }
-    body { background: #111; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
-    #ui { position: absolute; top: 10px; left: 10px; display: flex; gap: 10px; z-index: 10; }
-    .hotbar-slot { width: 50px; height: 50px; border: 2px solid #555; background: rgba(0,0,0,0.6); border-radius: 8px; display: flex; flex-direction: column; align-items: center; justify-content: center; cursor: pointer; font-size: 11px; user-select: none; }
-    .hotbar-slot.active { border-color: #00e676; background: rgba(0,230,118,0.2); }
-    .slot-color { width: 20px; height: 20px; border-radius: 4px; margin-bottom: 2px; }
-    #instructions { position: absolute; top: 10px; right: 10px; background: rgba(0,0,0,0.7); padding: 10px 15px; border-radius: 8px; font-size: 12px; line-height: 1.5; z-index: 10; pointer-events: none; }
-    canvas { border: 2px solid #333; background: #87CEEB; image-rendering: pixelated; box-shadow: 0 10px 30px rgba(0,0,0,0.8); }
+    body { background: #0a0a0c; color: #fff; font-family: 'Segoe UI', Tahoma, sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; overflow: hidden; }
+    #hud { position: absolute; top: 15px; left: 15px; z-index: 10; display: flex; flex-direction: column; gap: 8px; }
+    .health-bar { width: 180px; height: 18px; background: #333; border: 2px solid #555; border-radius: 4px; overflow: hidden; }
+    .health-fill { height: 100%; width: 100%; background: #e53935; transition: width 0.1s linear; }
+    #info { font-size: 13px; background: rgba(0,0,0,0.6); padding: 6px 12px; border-radius: 4px; border: 1px solid #444; }
+    canvas { border: 2px solid #222; background: linear-gradient(to bottom, #101820, #080810); box-shadow: 0 10px 30px rgba(0,0,0,0.9); }
   </style>
 </head>
 <body>
 
-<div id="ui">
-  <div class="hotbar-slot active" id="slot-1" onclick="selectSlot(1)">
-    <div class="slot-color" style="background:#556B2F"></div>
-    <span id="count-1">Dirt: 0</span>
-  </div>
-  <div class="hotbar-slot" id="slot-2" onclick="selectSlot(2)">
-    <div class="slot-color" style="background:#708090"></div>
-    <span id="count-2">Stone: 0</span>
-  </div>
-  <div class="hotbar-slot" id="slot-3" onclick="selectSlot(3)">
-    <div class="slot-color" style="background:#8B4513"></div>
-    <span id="count-3">Wood: 0</span>
-  </div>
-</div>
-
-<div id="instructions">
-  <b>Controls:</b><br>
-  A / D or ⬅️ / ➡️ : Move Left / Right<br>
-  W / Space / ⬆️ : Jump<br>
-  Left Click : Mine Block<br>
-  Right Click : Place Selected Block<br>
-  1, 2, 3 : Select Hotbar Slot
+<div id="hud">
+  <div class="health-bar"><div class="health-fill" id="hp-fill"></div></div>
+  <div id="info">Score: <span id="score">0</span> | Slimes Defeated: <span id="kills">0</span></div>
 </div>
 
 <canvas id="gameCanvas" width="800" height="480"></canvas>
@@ -48,218 +28,218 @@ const canvas = document.getElementById('gameCanvas');
 const ctx = canvas.getContext('2d');
 
 const TILE_SIZE = 32;
-const COLS = 50;
-const ROWS = 30;
+const COLS = 25;
+const ROWS = 15;
 
-// World Grid (0: Air, 1: Grass, 2: Dirt, 3: Stone, 4: Wood)
 let world = Array.from({ length: ROWS }, () => new Array(COLS).fill(0));
 
-const BLOCK_TYPES = {
-  1: { name: 'Grass', color: '#556B2F', topColor: '#7CFC00' },
-  2: { name: 'Dirt', color: '#556B2F', topColor: null },
-  3: { name: 'Stone', color: '#708090', topColor: null },
-  4: { name: 'Wood', color: '#8B4513', topColor: null }
-};
+// Fill bottom area with stone
+for (let y = 11; y < ROWS; y++) {
+  for (let x = 0; x < COLS; x++) {
+    world[y][x] = 1;
+  }
+}
 
-let inventory = { 1: 10, 2: 10, 3: 5 }; // Initial blocks
-let activeSlot = 1;
-
-// Player Setup
 let player = {
-  x: 400,
-  y: 100,
-  width: 20,
-  height: 48,
-  vx: 0,
-  vy: 0,
-  speed: 4,
-  jumpPower: -10,
-  grounded: false
+  x: 100, y: 200, w: 22, h: 44,
+  vx: 0, vy: 0,
+  speed: 4.5, jumpPower: -11,
+  hp: 100, maxHp: 100,
+  grounded: false,
+  facing: 1, // 1 right, -1 left
+  attacking: false, attackTimer: 0,
+  invulnerable: 0
 };
 
+let enemies = [];
+let score = 0;
+let kills = 0;
 const keys = {};
 
-// Procedural Terrain Generation
-function generateWorld() {
-  for (let x = 0; x < COLS; x++) {
-    // Sine wave terrain
-    let surfaceY = Math.floor(12 + Math.sin(x * 0.2) * 3);
-    
-    for (let y = 0; y < ROWS; y++) {
-      if (y === surfaceY) {
-        world[y][x] = 1; // Grass
-      } else if (y > surfaceY && y < surfaceY + 5) {
-        world[y][x] = 2; // Dirt
-      } else if (y >= surfaceY + 5) {
-        world[y][x] = 3; // Stone
-      }
-    }
-
-    // Generate random trees
-    if (x > 3 && x < COLS - 4 && Math.random() < 0.15 && world[surfaceY][x] === 1) {
-      let trunkHeight = Math.floor(Math.random() * 3) + 3;
-      for (let i = 1; i <= trunkHeight; i++) {
-        if (surfaceY - i >= 0) world[surfaceY - i][x] = 4; // Wood Trunk
-      }
-    }
-  }
-}
-
-// Input Handlers
-window.addEventListener('keydown', e => {
-  keys[e.key.toLowerCase()] = true;
-  if (['1', '2', '3'].includes(e.key)) selectSlot(parseInt(e.key));
-});
+window.addEventListener('keydown', e => keys[e.key.toLowerCase()] = true);
 window.addEventListener('keyup', e => keys[e.key.toLowerCase()] = false);
 
-// Disable context menu for right-click placement
-canvas.addEventListener('contextmenu', e => e.preventDefault());
-
-let mousePos = { x: 0, y: 0 };
-canvas.addEventListener('mousemove', e => {
-  const rect = canvas.getBoundingClientRect();
-  mousePos.x = e.clientX - rect.left;
-  mousePos.y = e.clientY - rect.top;
-});
-
 canvas.addEventListener('mousedown', e => {
-  const gridX = Math.floor(mousePos.x / TILE_SIZE);
-  const gridY = Math.floor(mousePos.y / TILE_SIZE);
-
-  if (gridX < 0 || gridX >= COLS || gridY < 0 || gridY >= ROWS) return;
-
-  // Calculate distance from player
-  const playerGridX = Math.floor((player.x + player.width / 2) / TILE_SIZE);
-  const playerGridY = Math.floor((player.y + player.height / 2) / TILE_SIZE);
-  const dist = Math.hypot(gridX - playerGridX, gridY - playerGridY);
-
-  if (dist > 6) return; // Reach limit
-
-  if (e.button === 0) { // Mine
-    let block = world[gridY][gridX];
-    if (block !== 0) {
-      let itemType = block === 1 ? 1 : block; // Grass converts to dirt item
-      inventory[itemType] = (inventory[itemType] || 0) + 1;
-      world[gridY][gridX] = 0;
-      updateUI();
-    }
-  } else if (e.button === 2) { // Place
-    if (world[gridY][gridX] === 0 && inventory[activeSlot] > 0) {
-      // Don't place inside player bounds
-      const blockRect = { x: gridX * TILE_SIZE, y: gridY * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
-      if (!checkOverlap(player, blockRect)) {
-        world[gridY][gridX] = activeSlot === 1 ? 2 : activeSlot; // Place dirt or stone
-        inventory[activeSlot]--;
-        updateUI();
-      }
-    }
+  if (e.button === 0 && !player.attacking) {
+    player.attacking = true;
+    player.attackTimer = 15; // Attack frame duration
   }
 });
 
-function selectSlot(slot) {
-  activeSlot = slot;
-  document.querySelectorAll('.hotbar-slot').forEach(el => el.classList.remove('active'));
-  document.getElementById(`slot-${slot}`).classList.add('active');
+function spawnEnemy() {
+  if (enemies.length < 5) {
+    enemies.push({
+      x: Math.random() > 0.5 ? 20 : 750,
+      y: 200, w: 26, h: 26,
+      vx: 0, vy: 0,
+      hp: 30,
+      color: '#4caf50',
+      jumpTimer: 0
+    });
+  }
 }
 
-function updateUI() {
-  document.getElementById('count-1').innerText = `Dirt: ${inventory[1] || 0}`;
-  document.getElementById('count-2').innerText = `Stone: ${inventory[2] || 0}`;
-  document.getElementById('count-3').innerText = `Wood: ${inventory[3] || 0}`;
-}
+setInterval(spawnEnemy, 3000);
 
 function checkOverlap(r1, r2) {
-  return !(r1.x + r1.width <= r2.x || r1.x >= r2.x + r2.width || r1.y + r1.height <= r2.y || r1.y >= r2.y + r2.height);
+  return !(r1.x + r1.w <= r2.x || r1.x >= r2.x + r2.w || r1.y + r1.h <= r2.y || r1.y >= r2.y + r2.h);
 }
 
 function updatePhysics() {
-  // Horizontal movement
-  if (keys['a'] || keys['arrowleft']) player.vx = -player.speed;
-  else if (keys['d'] || keys['arrowright']) player.vx = player.speed;
+  if (player.hp <= 0) return;
+
+  // Movement
+  if (keys['a'] || keys['arrowleft']) { player.vx = -player.speed; player.facing = -1; }
+  else if (keys['d'] || keys['arrowright']) { player.vx = player.speed; player.facing = 1; }
   else player.vx = 0;
 
-  // Jump
   if ((keys['w'] || keys[' '] || keys['arrowup']) && player.grounded) {
     player.vy = player.jumpPower;
     player.grounded = false;
   }
 
-  // Gravity
-  player.vy += 0.5;
+  player.vy += 0.55; // Gravity
 
-  // X Collision
+  // Player Terrain Collision
   player.x += player.vx;
-  for (let y = 0; y < ROWS; y++) {
-    for (let x = 0; x < COLS; x++) {
-      if (world[y][x] !== 0) {
-        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
-        if (checkOverlap(player, block)) {
-          if (player.vx > 0) player.x = block.x - player.width;
-          else if (player.vx < 0) player.x = block.x + block.width;
+  resolveXCollisions(player);
+  player.y += player.vy;
+  player.grounded = resolveYCollisions(player);
+
+  // Attack timer
+  if (player.attacking) {
+    player.attackTimer--;
+    if (player.attackTimer <= 0) player.attacking = false;
+  }
+
+  if (player.invulnerable > 0) player.invulnerable--;
+
+  // Enemy AI & Physics
+  enemies.forEach((e, idx) => {
+    // Basic AI - follow player
+    e.vx = e.x < player.x ? 1.5 : -1.5;
+    e.vy += 0.5;
+
+    // Slime jumping mechanic
+    e.jumpTimer++;
+    if (e.jumpTimer > 90) {
+      e.vy = -7;
+      e.jumpTimer = 0;
+    }
+
+    e.x += e.vx;
+    resolveXCollisions(e);
+    e.y += e.vy;
+    resolveYCollisions(e);
+
+    // Player attack hit detection
+    if (player.attacking && player.attackTimer === 10) {
+      let attackBox = {
+        x: player.facing === 1 ? player.x + player.w : player.x - 35,
+        y: player.y - 10,
+        w: 35, h: player.h + 20
+      };
+
+      if (checkOverlap(attackBox, e)) {
+        e.hp -= 15;
+        e.vy = -4; // Knockback
+        e.vx = player.facing * 6;
+        if (e.hp <= 0) {
+          enemies.splice(idx, 1);
+          score += 100;
+          kills++;
+          document.getElementById('score').innerText = score;
+          document.getElementById('kills').innerText = kills;
         }
       }
     }
-  }
 
-  // Y Collision
-  player.y += player.vy;
-  player.grounded = false;
+    // Enemy touches player
+    if (checkOverlap(player, e) && player.invulnerable === 0) {
+      player.hp -= 15;
+      player.invulnerable = 30; // 30 frames grace period
+      player.vy = -5;
+      player.vx = e.x < player.x ? 6 : -6;
+      document.getElementById('hp-fill').style.width = `${Math.max(0, player.hp)}%`;
+    }
+  });
+}
+
+function resolveXCollisions(obj) {
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
       if (world[y][x] !== 0) {
-        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, width: TILE_SIZE, height: TILE_SIZE };
-        if (checkOverlap(player, block)) {
-          if (player.vy > 0) {
-            player.y = block.y - player.height;
-            player.vy = 0;
-            player.grounded = true;
-          } else if (player.vy < 0) {
-            player.y = block.y + block.height;
-            player.vy = 0;
-          }
+        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE };
+        if (checkOverlap(obj, block)) {
+          if (obj.vx > 0) obj.x = block.x - obj.w;
+          else if (obj.vx < 0) obj.x = block.x + block.w;
         }
       }
     }
   }
 }
 
+function resolveYCollisions(obj) {
+  let onGround = false;
+  for (let y = 0; y < ROWS; y++) {
+    for (let x = 0; x < COLS; x++) {
+      if (world[y][x] !== 0) {
+        let block = { x: x * TILE_SIZE, y: y * TILE_SIZE, w: TILE_SIZE, h: TILE_SIZE };
+        if (checkOverlap(obj, block)) {
+          if (obj.vy > 0) {
+            obj.y = block.y - obj.h;
+            obj.vy = 0;
+            onGround = true;
+          } else if (obj.vy < 0) {
+            obj.y = block.y + block.h;
+            obj.vy = 0;
+          }
+        }
+      }
+    }
+  }
+  return onGround;
+}
+
 function draw() {
   ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-  // Draw World
+  // Draw Ground
   for (let y = 0; y < ROWS; y++) {
     for (let x = 0; x < COLS; x++) {
-      let tile = world[y][x];
-      if (tile !== 0) {
-        ctx.fillStyle = BLOCK_TYPES[tile].color;
+      if (world[y][x] === 1) {
+        ctx.fillStyle = '#37474F';
         ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
-        
-        // Grass top accent
-        if (tile === 1) {
-          ctx.fillStyle = BLOCK_TYPES[1].topColor;
-          ctx.fillRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, 6);
-        }
-
-        // Tile outlines
-        ctx.strokeStyle = 'rgba(0,0,0,0.15)';
+        ctx.strokeStyle = '#263238';
         ctx.strokeRect(x * TILE_SIZE, y * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
     }
   }
 
-  // Draw Target Outline
-  const gridX = Math.floor(mousePos.x / TILE_SIZE);
-  const gridY = Math.floor(mousePos.y / TILE_SIZE);
-  ctx.strokeStyle = 'rgba(255, 255, 255, 0.6)';
-  ctx.lineWidth = 2;
-  ctx.strokeRect(gridX * TILE_SIZE, gridY * TILE_SIZE, TILE_SIZE, TILE_SIZE);
+  // Draw Enemies
+  enemies.forEach(e => {
+    ctx.fillStyle = e.color;
+    ctx.fillRect(e.x, e.y, e.w, e.h);
+  });
 
   // Draw Player
-  ctx.fillStyle = '#FF5722';
-  ctx.fillRect(player.x, player.y, player.width, player.height);
-  // Player Eye
-  ctx.fillStyle = '#FFF';
-  ctx.fillRect(player.x + (player.vx >= 0 ? 12 : 2), player.y + 8, 6, 6);
+  if (player.hp > 0) {
+    ctx.fillStyle = player.invulnerable % 4 > 2 ? '#ff8a80' : '#29b6f6';
+    ctx.fillRect(player.x, player.y, player.w, player.h);
+
+    // Sword Arc Attack
+    if (player.attacking) {
+      ctx.fillStyle = '#fff59d';
+      let swordX = player.facing === 1 ? player.x + player.w : player.x - 30;
+      ctx.fillRect(swordX, player.y + 10, 30, 8);
+    }
+  } else {
+    // Game Over Text
+    ctx.fillStyle = '#e53935';
+    ctx.font = '30px sans-serif';
+    ctx.textAlign = 'center';
+    ctx.fillText('GAME OVER - Refresh to Restart', canvas.width / 2, canvas.height / 2);
+  }
 }
 
 function loop() {
@@ -268,8 +248,6 @@ function loop() {
   requestAnimationFrame(loop);
 }
 
-generateWorld();
-updateUI();
 loop();
 </script>
 </body>
